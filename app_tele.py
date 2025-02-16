@@ -36,11 +36,6 @@ st.set_page_config(page_title="실버케어 음성 비서", page_icon="🎤", la
 # OpenAI 클라이언트 초기화
 client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 
-# Pygame 초기화 (오류 처리 추가)
-try:
-    pygame.mixer.init()
-except Exception as e:
-    st.warning("오디오 장치를 초기화할 수 없습니다. 음성 재생이 불가능할 수 있습니다.")
 
 # 임시 파일 디렉토리 생성
 if not os.path.exists("temp_audio"):
@@ -50,41 +45,12 @@ if not os.path.exists("temp_audio"):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-
 def text_to_speech(text, voice="shimmer"):
-    """텍스트를 음성으로 변환하고 스피커로 재생"""
+    """텍스트를 음성으로 변환"""
     try:
-        # 임시 파일 경로 설정
-        temp_file = os.path.join(
-            "temp_audio", f"speech_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp3"
-        )
-
-        # OpenAI TTS API 호출
+        # OpenAI TTS API 호출만 하고 파일 저장/재생은 하지 않음
         response = client.audio.speech.create(model="tts-1", voice=voice, input=text)
-
-        # 파일 저장
-        with open(temp_file, "wb") as f:
-            response.stream_to_file(temp_file)
-
-        try:
-            # Pygame으로 재생 시도
-            pygame.mixer.music.load(temp_file)
-            pygame.mixer.music.play()
-
-            # 재생이 끝날 때까지 대기
-            while pygame.mixer.music.get_busy():
-                time.sleep(0.1)
-
-        except Exception as e:
-            st.warning(f"음성을 재생할 수 없습니다: {e}")
-        finally:
-            # 재생 완료 후 파일 삭제
-            try:
-                pygame.mixer.music.unload()
-                os.remove(temp_file)
-            except:
-                pass
-
+        st.info("🔊 음성이 생성되었습니다. (Cloud 환경에서는 재생이 불가능합니다)")
         return True
     except Exception as e:
         st.error(f"음성 변환 오류: {e}")
@@ -104,25 +70,19 @@ def generate_response(prompt):
 # 전역 변수로 mixer 초기화 상태 추적
 PYGAME_MIXER_INITIALIZED = False
 
-try:
-    pygame.mixer.init()
-    PYGAME_MIXER_INITIALIZED = True
-except Exception as e:
-    st.warning("오디오 장치를 초기화할 수 없습니다. 음성 재생이 불가능할 수 있습니다.")
+
 
 # 사이드바 설정
 with st.sidebar:
     st.title("⚙️ 설정")
     voice_option = st.radio("음성 선택", ["여성 (shimmer)", "남성 (onyx)"], index=0)
 
-    # 볼륨 조절 (Pygame mixer 초기화 여부 확인)
+    # 볼륨 슬라이더는 유지하되 실제 동작하지 않음을 안내
     volume = st.slider("음량", 0, 100, 50)
-    if PYGAME_MIXER_INITIALIZED:
-        pygame.mixer.music.set_volume(volume / 100.0)
-    else:
-        st.info("오디오 장치가 없어 볼륨 조절이 불가능합니다.")
+    st.info("❗ Cloud 환경에서는 음성 재생이 지원되지 않습니다.")
 
     st.divider()
+    
 
     # 긴급 연락 섹션
     st.markdown("### ⚠️ 긴급 연락")
