@@ -18,7 +18,8 @@ client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 
 # 텔레그램 봇 설정
 TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
-TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "your_default_chat_id")
+TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "5767743818")
+
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 # 음성 인식 컴포넌트 초기화
