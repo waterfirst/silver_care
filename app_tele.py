@@ -9,6 +9,7 @@ import telebot
 # 텔레그램 봇 설정
 TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
+
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 
