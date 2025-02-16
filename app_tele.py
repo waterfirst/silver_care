@@ -1,25 +1,101 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
-import pygame
-import os
+import base64
 from datetime import datetime
-import time
 import telebot
+import os
+
+# 페이지 설정
+st.set_page_config(
+    page_title="실버케어 음성 비서",
+    page_icon="🎤",
+    layout="wide"
+)
+
+# OpenAI 클라이언트 초기화
+client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 
 # 텔레그램 봇 설정
 TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
-# app_tele.py 파일에서
-TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "5767743818")  # 기본값 설정
-
+TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "your_default_chat_id")
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
+# 음성 인식 컴포넌트 초기화
+def init_speech_recognition():
+    components.html(
+        """
+        <script>
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ko-KR';
+        recognition.continuous = false;
+        recognition.interimResults = false;
 
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            window.parent.postMessage({
+                type: 'speech-recognition',
+                text: text
+            }, '*');
+        };
+
+        window.startRecognition = () => {
+            recognition.start();
+        }
+        </script>
+        <button onclick="startRecognition()" class="stButton">
+            🎤 음성으로 말하기
+        </button>
+        """,
+        height=50
+    )
+
+# 텍스트를 음성으로 변환
+def text_to_speech(text, voice="shimmer"):
+    try:
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice,
+            input=text
+        )
+        
+        # 오디오 데이터를 base64로 인코딩
+        audio_bytes = response.content
+        audio_base64 = base64.b64encode(audio_bytes).decode()
+        
+        # HTML 오디오 플레이어 생성
+        audio_html = f'''
+            <audio autoplay="true" controls>
+                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+            </audio>
+        '''
+        st.components.v1.html(audio_html, height=50)
+        return True
+    except Exception as e:
+        st.error(f"음성 변환 오류: {e}")
+        return False
+
+# GPT 응답 생성
+@st.cache_data(ttl=3600)
+def generate_response(prompt):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=150
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"GPT 응답 생성 오류: {e}")
+        return None
+
+# 긴급 알림 전송
 def send_emergency_alert():
-    """텔레그램으로 긴급 알림 전송"""
     try:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         message = f"""🚨 긴급 상황 발생!
-
 발생 시간: {current_time}
 상황: 긴급 도움 요청
 """
@@ -29,68 +105,30 @@ def send_emergency_alert():
         st.error(f"텔레그램 메시지 전송 실패: {str(e)}")
         return False
 
-
-# 페이지 설정
-st.set_page_config(page_title="실버케어 음성 비서", page_icon="🎤", layout="wide")
-
-# OpenAI 클라이언트 초기화
-client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
-
-
-# 임시 파일 디렉토리 생성
-if not os.path.exists("temp_audio"):
-    os.makedirs("temp_audio")
-
 # 세션 상태 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-def text_to_speech(text, voice="shimmer"):
-    """텍스트를 음성으로 변환"""
-    try:
-        # OpenAI TTS API 호출만 하고 파일 저장/재생은 하지 않음
-        response = client.audio.speech.create(model="tts-1", voice=voice, input=text)
-        st.info("🔊 음성이 생성되었습니다. (Cloud 환경에서는 재생이 불가능합니다)")
-        return True
-    except Exception as e:
-        st.error(f"음성 변환 오류: {e}")
-        return False
-
-def generate_response(prompt):
-    """GPT 응답 생성"""
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        st.error(f"GPT 응답 생성 오류: {e}")
-        return None
-
-# 전역 변수로 mixer 초기화 상태 추적
-PYGAME_MIXER_INITIALIZED = False
-
-
-
 # 사이드바 설정
 with st.sidebar:
     st.title("⚙️ 설정")
-    voice_option = st.radio("음성 선택", ["여성 (shimmer)", "남성 (onyx)"], index=0)
-
-    # 볼륨 슬라이더는 유지하되 실제 동작하지 않음을 안내
+    voice_option = st.radio(
+        "음성 선택",
+        ["여성 (shimmer)", "남성 (onyx)"],
+        index=0
+    )
+    
+    # 음량 설정
     volume = st.slider("음량", 0, 100, 50)
-    st.info("❗ Cloud 환경에서는 음성 재생이 지원되지 않습니다.")
-
+    
     st.divider()
     
-
     # 긴급 연락 섹션
     st.markdown("### ⚠️ 긴급 연락")
     if st.button("🚨 긴급 도움 요청", use_container_width=True):
         with st.spinner("긴급 알림 전송 중..."):
             if send_emergency_alert():
                 st.success("긴급 알림이 전송되었습니다!")
-                # 음성 안내
                 text_to_speech(
                     "긴급 알림이 전송되었습니다. 곧 도움이 도착할 예정입니다."
                 )
@@ -100,29 +138,31 @@ with st.sidebar:
 # 메인 화면
 st.title("🎤 실버케어 음성 비서")
 
+# 음성 인식 초기화
+init_speech_recognition()
+
 # 채팅 기록 표시
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 사용자 입력
+# 사용자 입력 처리
 if prompt := st.chat_input("무엇을 도와드릴까요?"):
     # 사용자 메시지 추가
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    # 로딩 표시
+    
+    # 응답 생성 및 처리
     with st.spinner("응답 생성 중..."):
-        # GPT 응답 생성
         response = generate_response(prompt)
-
         if response:
-            # 응답 메시지 추가
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.session_state.messages.append(
+                {"role": "assistant", "content": response}
+            )
             with st.chat_message("assistant"):
                 st.markdown(response)
-
+            
             # 음성 변환 및 재생
             voice = "shimmer" if "여성" in voice_option else "onyx"
             text_to_speech(response, voice)
