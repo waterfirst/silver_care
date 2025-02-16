@@ -101,15 +101,26 @@ def generate_response(prompt):
         st.error(f"GPT 응답 생성 오류: {e}")
         return None
 
+# 전역 변수로 mixer 초기화 상태 추적
+PYGAME_MIXER_INITIALIZED = False
+
+try:
+    pygame.mixer.init()
+    PYGAME_MIXER_INITIALIZED = True
+except Exception as e:
+    st.warning("오디오 장치를 초기화할 수 없습니다. 음성 재생이 불가능할 수 있습니다.")
 
 # 사이드바 설정
 with st.sidebar:
     st.title("⚙️ 설정")
     voice_option = st.radio("음성 선택", ["여성 (shimmer)", "남성 (onyx)"], index=0)
 
-    # 볼륨 조절
+    # 볼륨 조절 (Pygame mixer 초기화 여부 확인)
     volume = st.slider("음량", 0, 100, 50)
-    pygame.mixer.music.set_volume(volume / 100.0)
+    if PYGAME_MIXER_INITIALIZED:
+        pygame.mixer.music.set_volume(volume / 100.0)
+    else:
+        st.info("오디오 장치가 없어 볼륨 조절이 불가능합니다.")
 
     st.divider()
 
