@@ -34,7 +34,7 @@ def send_emergency_alert():
 st.set_page_config(page_title="실버케어 음성 비서", page_icon="🎤", layout="wide")
 
 # OpenAI 클라이언트 초기화
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 
 # Pygame 초기화
 pygame.mixer.init()
