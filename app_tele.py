@@ -36,8 +36,11 @@ st.set_page_config(page_title="실버케어 음성 비서", page_icon="🎤", la
 # OpenAI 클라이언트 초기화
 client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 
-# Pygame 초기화
-pygame.mixer.init()
+# Pygame 초기화 (오류 처리 추가)
+try:
+    pygame.mixer.init()
+except Exception as e:
+    st.warning("오디오 장치를 초기화할 수 없습니다. 음성 재생이 불가능할 수 있습니다.")
 
 # 임시 파일 디렉토리 생성
 if not os.path.exists("temp_audio"):
@@ -64,7 +67,7 @@ def text_to_speech(text, voice="shimmer"):
             response.stream_to_file(temp_file)
 
         try:
-            # Pygame으로 재생
+            # Pygame으로 재생 시도
             pygame.mixer.music.load(temp_file)
             pygame.mixer.music.play()
 
@@ -73,11 +76,11 @@ def text_to_speech(text, voice="shimmer"):
                 time.sleep(0.1)
 
         except Exception as e:
-            st.error(f"오디오 재생 오류: {e}")
+            st.warning(f"음성을 재생할 수 없습니다: {e}")
         finally:
             # 재생 완료 후 파일 삭제
-            pygame.mixer.music.unload()
             try:
+                pygame.mixer.music.unload()
                 os.remove(temp_file)
             except:
                 pass
@@ -86,7 +89,6 @@ def text_to_speech(text, voice="shimmer"):
     except Exception as e:
         st.error(f"음성 변환 오류: {e}")
         return False
-
 
 def generate_response(prompt):
     """GPT 응답 생성"""
